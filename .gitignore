@@ -44,6 +44,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local dev database (PGlite stand-in for Supabase Postgres)
+.pglite-data
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

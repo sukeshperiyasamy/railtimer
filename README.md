@@ -5,10 +5,12 @@ train schedules, routes, PNR status, chart-preparation countdowns, and running
 status. Built for programmatic scale (thousands of train/route pages) without
 shipping thin, auto-generated-looking pages.
 
-> **Status:** early scaffold. Core architecture (data layer, layout shell, ad
-> component) is in place; homepage, train/route page templates, and tools
-> pages are still to come. No live third-party accounts are wired up yet —
-> everything runs against a mock data provider.
+> **Status:** early build. Core architecture (data layer, layout shell, ad
+> component) is in place, Supabase is connected with 8 real seeded trains,
+> and the chart-preparation time calculator ([`/tools/chart-time-calculator`](app/tools/chart-time-calculator/page.tsx))
+> is fully built and verified. Homepage, train/route page templates, and the
+> PNR status tool are still to come. Live train data still runs against a
+> mock provider — no rail-data API key configured yet.
 
 ## Tech stack
 
