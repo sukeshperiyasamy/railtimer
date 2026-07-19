@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Train {
+  id            String   @id @default(cuid())
+  trainNumber   String   @unique
+  trainName     String
+  slug          String   @unique
+  sourceStation String
+  destStation   String
+  runsOn        String[] // days of week
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  stops         Stop[]
+
+  @@index([sourceStation, destStation])
+}
+
+model Stop {
+  id            String @id @default(cuid())
+  train         Train  @relation(fields: [trainId], references: [id], onDelete: Cascade)
+  trainId       String
+  stationCode   String
+  stationName   String
+  arrivalTime   String?
+  departureTime String?
+  dayNumber     Int
+  sequence      Int
+
+  @@index([trainId])
+  @@index([stationCode])
+}
+
+model BlogPost {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  content     String
+  publishedAt DateTime @default(now())
+}
