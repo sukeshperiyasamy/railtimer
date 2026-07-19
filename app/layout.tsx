@@ -18,11 +18,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "RailTimer — Indian Railways PNR Status, Running Status & Train Info",
+    default: "RailTimer — Know When Current Booking Opens for Your Train",
     template: "%s | RailTimer",
   },
   description:
-    "Live PNR status, train running status, seat availability, and route information for Indian Railways trains — fast, mobile-friendly, and always current.",
+    "Calculate exactly when your train's chart is prepared and current booking opens. Free Current Availability Calculator for Indian Railways passengers — no login required.",
 };
 
 export default function RootLayout({

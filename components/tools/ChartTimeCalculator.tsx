@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Bell, CheckCircle2, Search } from "lucide-react";
+import { Bell, CheckCircle2, Search, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,18 +41,38 @@ function todayISO(): string {
   return local.toISOString().slice(0, 10);
 }
 
-export function ChartTimeCalculator() {
-  const [query, setQuery] = useState("");
+export interface ChartTimeCalculatorInitialTrain {
+  trainNumber: string;
+  trainName: string;
+  departureTime: string | null;
+}
+
+interface ChartTimeCalculatorProps {
+  /** Pre-fills the train field, e.g. when embedded on a specific train's page. */
+  initialTrain?: ChartTimeCalculatorInitialTrain;
+  /** Calculates immediately for today's date once mounted, if initialTrain has a known departure time. */
+  autoCalculate?: boolean;
+}
+
+export function ChartTimeCalculator({ initialTrain, autoCalculate = false }: ChartTimeCalculatorProps = {}) {
+  const [query, setQuery] = useState(
+    initialTrain ? `${initialTrain.trainNumber} - ${initialTrain.trainName}` : "",
+  );
   const [suggestions, setSuggestions] = useState<TrainSearchResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedTrain, setSelectedTrain] = useState<TrainSearchResult | null>(null);
+  const [timeSource, setTimeSource] = useState<"schedule" | "manual">(
+    initialTrain?.departureTime ? "schedule" : "manual",
+  );
   const [isSearching, startSearch] = useTransition();
 
   const [journeyDate, setJourneyDate] = useState(todayISO());
-  const [departureTime, setDepartureTime] = useState("");
+  const [departureTime, setDepartureTime] = useState(initialTrain?.departureTime ?? "");
   const [result, setResult] = useState<ChartTimeResult | null>(null);
   const [notifyRequested, setNotifyRequested] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
+  const [hasEditedQuery, setHasEditedQuery] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -63,10 +83,22 @@ export function ChartTimeCalculator() {
     return () => clearInterval(interval);
   }, []);
 
+  // Auto-calculate once, for a pre-filled train, on mount only.
+  useEffect(() => {
+    if (!autoCalculate || !initialTrain?.departureTime) return;
+    const [hours, minutes] = initialTrain.departureTime.split(":").map(Number);
+    const [year, month, day] = todayISO().split("-").map(Number);
+    const departure = new Date(year, month - 1, day, hours, minutes, 0, 0);
+    setResult(calculateChartTimes(departure));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function handleQueryChange(value: string) {
     setQuery(value);
     setSelectedTrain(null);
+    setTimeSource("manual");
     setResult(null);
+    setHasEditedQuery(true);
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (value.trim().length < 2) {
@@ -89,6 +121,9 @@ export function ChartTimeCalculator() {
     setShowSuggestions(false);
     if (train.departureTime) {
       setDepartureTime(train.departureTime);
+      setTimeSource("schedule");
+    } else {
+      setTimeSource("manual");
     }
   }
 
@@ -102,9 +137,36 @@ export function ChartTimeCalculator() {
 
     setResult(calculateChartTimes(departure));
     setNotifyRequested(false);
+    setShareCopied(false);
   }
 
-  const needsManualTime = !selectedTrain;
+  async function handleShare() {
+    if (!result) return;
+
+    const trainLabel = selectedTrain
+      ? `${selectedTrain.trainNumber} ${selectedTrain.trainName}`
+      : query || "This train";
+    const text = `${trainLabel}: first chart ${formatDateTime(result.firstChartTime)}, current booking opens ${formatDateTime(result.currentBookingOpensAt)}. Check yours on RailTimer.`;
+    const url =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/tools/chart-time-calculator`
+        : undefined;
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: "Chart & current booking time", text, url });
+      } catch {
+        // Share sheet dismissed — no-op.
+      }
+      return;
+    }
+
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      await navigator.clipboard.writeText(url ? `${text} ${url}` : text);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    }
+  }
 
   return (
     <Card className="border-border">
@@ -151,7 +213,7 @@ export function ChartTimeCalculator() {
               <p className="mt-1 text-xs text-muted-foreground">Searching…</p>
             ) : null}
 
-            {query.trim().length >= 2 && !isSearching && suggestions.length === 0 ? (
+            {hasEditedQuery && query.trim().length >= 2 && !isSearching && suggestions.length === 0 ? (
               <p className="mt-1 text-xs text-muted-foreground">
                 Train not found in our database yet — enter its scheduled departure time
                 below and we&apos;ll still calculate the chart timing for you.
@@ -173,7 +235,7 @@ export function ChartTimeCalculator() {
             </div>
             <div>
               <Label htmlFor="departure-time">
-                Departure time{!needsManualTime && " (editable)"}
+                Departure time{timeSource === "schedule" && " (editable)"}
               </Label>
               <Input
                 id="departure-time"
@@ -244,6 +306,17 @@ export function ChartTimeCalculator() {
                   </span>
                 ) : (
                   "Notify me"
+                )}
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={handleShare}>
+                {shareCopied ? (
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle2 className="h-4 w-4" /> Copied
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    <Share2 className="h-4 w-4" /> Share
+                  </span>
                 )}
               </Button>
             </div>

@@ -16,6 +16,12 @@ model Train {
   sourceStation String
   destStation   String
   runsOn        String[] // days of week
+  // Denormalized summary fields for fast list/sitemap rendering without a
+  // Stop join — source of truth remains the Stop rows; keep these in sync
+  // when stops change. Nullable so backfilling is non-breaking.
+  departureTime String? // source station departure, e.g. "16:25"
+  arrivalTime   String? // destination station arrival, e.g. "08:35"
+  duration      String? // total journey time, e.g. "16h 10m"
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   stops         Stop[]
@@ -24,11 +30,13 @@ model Train {
 }
 
 model Stop {
-  id            String @id @default(cuid())
-  train         Train  @relation(fields: [trainId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  train         Train    @relation(fields: [trainId], references: [id], onDelete: Cascade)
   trainId       String
   stationCode   String
   stationName   String
+  station       Station? @relation(fields: [stationId], references: [id])
+  stationId     String?
   arrivalTime   String?
   departureTime String?
   dayNumber     Int
@@ -36,6 +44,23 @@ model Stop {
 
   @@index([trainId])
   @@index([stationCode])
+  @@index([stationId])
+}
+
+/// Additive station registry (code/name/state/coordinates) for future
+/// station pages. Stop.stationCode/stationName remain the source of truth
+/// for schedule rendering — Station is an optional enrichment, linked via
+/// Stop.stationId once populated.
+model Station {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  state     String?
+  latitude  Float?
+  longitude Float?
+  stops     Stop[]
+
+  @@index([code])
 }
 
 model BlogPost {

@@ -156,8 +156,30 @@ const trains: TrainSeed[] = [
   },
 ];
 
+/** Denormalized departure/arrival/duration summary from the first and last stop. */
+function summarize(stops: StopSeed[]): { departureTime: string; arrivalTime: string; duration: string } {
+  const first = stops[0];
+  const last = stops[stops.length - 1];
+  const [depH, depM] = first.departureTime!.split(":").map(Number);
+  const [arrH, arrM] = last.arrivalTime!.split(":").map(Number);
+
+  const depMinutes = depH * 60 + depM;
+  const arrMinutesAbs = (last.dayNumber - first.dayNumber) * 24 * 60 + arrH * 60 + arrM;
+  const totalMinutes = arrMinutesAbs - depMinutes;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return {
+    departureTime: first.departureTime!,
+    arrivalTime: last.arrivalTime!,
+    duration: `${hours}h ${minutes}m`,
+  };
+}
+
 async function main() {
   for (const train of trains) {
+    const summary = summarize(train.stops);
+
     await prisma.train.upsert({
       where: { trainNumber: train.trainNumber },
       update: {
@@ -166,6 +188,7 @@ async function main() {
         sourceStation: train.sourceStation,
         destStation: train.destStation,
         runsOn: train.runsOn,
+        ...summary,
         stops: {
           deleteMany: {},
           create: train.stops.map((stop, index) => ({
@@ -181,6 +204,7 @@ async function main() {
         sourceStation: train.sourceStation,
         destStation: train.destStation,
         runsOn: train.runsOn,
+        ...summary,
         stops: {
           create: train.stops.map((stop, index) => ({
             ...stop,
