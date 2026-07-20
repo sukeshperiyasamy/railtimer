@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   Table,
@@ -263,9 +264,12 @@ export default async function TrainPage({
         ]}
       />
 
-      <p className="mt-3 text-sm font-medium text-primary">
-        {train.sourceStation} → {train.destStation}
-      </p>
+      <Link
+        href={`/route/${train.sourceStation.toLowerCase()}-to-${train.destStation.toLowerCase()}`}
+        className="mt-3 inline-block text-sm font-medium text-primary underline-offset-4 hover:underline"
+      >
+        {train.sourceStation} → {train.destStation} · see all trains on this route
+      </Link>
       <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
         {train.trainNumber} {train.trainName}
       </h1>

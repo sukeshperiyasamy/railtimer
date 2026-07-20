@@ -6,7 +6,7 @@ import { TOOLS } from "@/lib/tools-directory";
 /**
  * Dynamic sitemap covering every real route: static/tool pages (including
  * "coming soon" ones — still worth crawling), train pages, station pages,
- * and blog pages.
+ * from-to route pages, and blog pages.
  *
  * Next.js sitemap.ts supports at most 50,000 URLs per file. Once train +
  * station + blog counts approach that limit, split this into a sitemap
@@ -15,22 +15,27 @@ import { TOOLS } from "@/lib/tools-directory";
  * Not needed yet at this scale.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  // ~5,200 trains + 26 stations + a handful of posts/static pages is well
-  // under the 50,000-URL sitemap.ts limit, so no cap is needed here.
-  const trains = await prisma.train.findMany({
-    select: { slug: true, updatedAt: true },
-    orderBy: { updatedAt: "desc" },
-  });
-
-  const stations = await prisma.station.findMany({
-    select: { code: true },
-    orderBy: { name: "asc" },
-  });
-
-  const posts = await prisma.blogPost.findMany({
-    select: { slug: true, publishedAt: true },
-    orderBy: { publishedAt: "desc" },
-  });
+  // ~5,200 trains + ~3,500 routes + 26 stations + a handful of posts/static
+  // pages is well under the 50,000-URL sitemap.ts limit, so no cap is
+  // needed here.
+  const [trains, stations, routePairs, posts] = await Promise.all([
+    prisma.train.findMany({
+      select: { slug: true, updatedAt: true },
+      orderBy: { updatedAt: "desc" },
+    }),
+    prisma.station.findMany({
+      select: { code: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.train.groupBy({
+      by: ["sourceStation", "destStation"],
+      _count: { sourceStation: true },
+    }),
+    prisma.blogPost.findMany({
+      select: { slug: true, publishedAt: true },
+      orderBy: { publishedAt: "desc" },
+    }),
+  ]);
 
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: SITE_URL, changeFrequency: "daily", priority: 1 },
@@ -59,6 +64,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
+  const routeRoutes: MetadataRoute.Sitemap = routePairs
+    .filter((pair) => pair.sourceStation !== pair.destStation)
+    .map((pair) => ({
+      url: `${SITE_URL}/route/${pair.sourceStation.toLowerCase()}-to-${pair.destStation.toLowerCase()}`,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    }));
+
   const blogRoutes: MetadataRoute.Sitemap = posts.map((post) => ({
     url: `${SITE_URL}/blog/${post.slug}`,
     lastModified: post.publishedAt,
@@ -66,5 +79,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }));
 
-  return [...staticRoutes, ...trainRoutes, ...stationRoutes, ...blogRoutes];
+  return [...staticRoutes, ...trainRoutes, ...stationRoutes, ...routeRoutes, ...blogRoutes];
 }
