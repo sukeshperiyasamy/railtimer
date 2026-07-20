@@ -40,7 +40,8 @@ const SECURITY_HEADERS = [
 const nextConfig: NextConfig = {
   experimental: {
     cpus: 1,
-  },
+    instrumentationHook: true,
+  } as NextConfig["experimental"] & { instrumentationHook?: boolean },
   async headers() {
     return [
       {
