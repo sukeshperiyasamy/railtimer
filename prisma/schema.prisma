@@ -16,6 +16,12 @@ model Train {
   sourceStation String
   destStation   String
   runsOn        String[] // days of week
+  // Trigram GIN indexes on trainName/trainNumber for fast ILIKE '%...%'
+  // search at 5,000+ rows exist in the DB (migration
+  // 20260720071439_add_pg_trgm_trainname_index) but aren't representable
+  // here without the postgresqlExtensions preview feature — don't run
+  // `prisma db push` or `migrate reset` against this schema, as either
+  // would drop them since they're "unmanaged" from schema.prisma's view.
   // Denormalized summary fields for fast list/sitemap rendering without a
   // Stop join — source of truth remains the Stop rows; keep these in sync
   // when stops change. Nullable so backfilling is non-breaking.

@@ -5,7 +5,7 @@ import { SITE_NAME, SITE_URL } from "@/lib/site";
 
 const CONTACT_EMAIL = "hello@anteclick.app";
 
-const TITLE = "Contact RailTimer";
+const TITLE = "Contact";
 const DESCRIPTION =
   "Get in touch with RailTimer — feedback, bug reports, business enquiries, or general questions about the Current Booking Calculator.";
 

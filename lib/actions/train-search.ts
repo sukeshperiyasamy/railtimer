@@ -22,7 +22,10 @@ export interface TrainSearchResult {
  * RailRadar-imported trains that don't yet have a Stop breakdown) rather
  * than joining Stop, which keeps this query cheap at scale.
  */
-export async function searchTrains(query: string): Promise<TrainSearchResult[]> {
+export async function searchTrains(
+  query: string,
+  limit: number = 8,
+): Promise<TrainSearchResult[]> {
   const q = query.trim();
   if (q.length < 2) return [];
 
@@ -33,7 +36,7 @@ export async function searchTrains(query: string): Promise<TrainSearchResult[]> 
         { trainName: { contains: q, mode: "insensitive" } },
       ],
     },
-    take: 8,
+    take: limit,
     orderBy: { trainName: "asc" },
   });
 

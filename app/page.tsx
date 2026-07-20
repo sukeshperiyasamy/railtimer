@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { TOOLS } from "@/lib/tools-directory";
 import { excerpt } from "@/lib/blog";
 import { formatClockTime } from "@/lib/format";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 
 export const revalidate = 3600;
 
@@ -67,8 +68,40 @@ export default async function Home() {
     })),
   };
 
+  const organizationJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: SITE_NAME,
+    url: SITE_URL,
+    description:
+      "Free tool for Indian Railways passengers that calculates exactly when current booking opens for a train.",
+  };
+
+  const websiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: SITE_NAME,
+    url: SITE_URL,
+    potentialAction: {
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: `${SITE_URL}/search?q={search_term_string}`,
+      },
+      "query-input": "required name=search_term_string",
+    },
+  };
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:py-14">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}

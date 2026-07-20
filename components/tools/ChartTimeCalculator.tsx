@@ -73,6 +73,7 @@ export function ChartTimeCalculator({ initialTrain, autoCalculate = false }: Cha
   const [shareCopied, setShareCopied] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
   const [hasEditedQuery, setHasEditedQuery] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -99,6 +100,7 @@ export function ChartTimeCalculator({ initialTrain, autoCalculate = false }: Cha
     setTimeSource("manual");
     setResult(null);
     setHasEditedQuery(true);
+    setActiveIndex(-1);
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (value.trim().length < 2) {
@@ -115,10 +117,28 @@ export function ChartTimeCalculator({ initialTrain, autoCalculate = false }: Cha
     }, 250);
   }
 
+  function handleQueryKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (!showSuggestions || suggestions.length === 0) return;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveIndex((i) => (i + 1) % suggestions.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveIndex((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
+    } else if (event.key === "Enter" && activeIndex >= 0) {
+      event.preventDefault();
+      selectTrain(suggestions[activeIndex]);
+    } else if (event.key === "Escape") {
+      setShowSuggestions(false);
+    }
+  }
+
   function selectTrain(train: TrainSearchResult) {
     setSelectedTrain(train);
     setQuery(`${train.trainNumber} - ${train.trainName}`);
     setShowSuggestions(false);
+    setActiveIndex(-1);
     if (train.departureTime) {
       setDepartureTime(train.departureTime);
       setTimeSource("schedule");
@@ -178,23 +198,35 @@ export function ChartTimeCalculator({ initialTrain, autoCalculate = false }: Cha
               <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="train-query"
+                role="combobox"
+                aria-expanded={showSuggestions && suggestions.length > 0}
+                aria-controls="chart-calc-suggestions"
+                aria-autocomplete="list"
                 placeholder="e.g. 12951 or Rajdhani Express"
                 value={query}
                 onChange={(e) => handleQueryChange(e.target.value)}
                 onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                onKeyDown={handleQueryKeyDown}
                 className="pl-9"
                 autoComplete="off"
               />
             </div>
 
             {showSuggestions && suggestions.length > 0 ? (
-              <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
-                {suggestions.map((train) => (
-                  <li key={train.trainNumber}>
+              <ul
+                id="chart-calc-suggestions"
+                role="listbox"
+                className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md"
+              >
+                {suggestions.map((train, index) => (
+                  <li key={train.trainNumber} role="option" aria-selected={index === activeIndex}>
                     <button
                       type="button"
                       onClick={() => selectTrain(train)}
-                      className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-muted"
+                      onMouseEnter={() => setActiveIndex(index)}
+                      className={`flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-muted ${
+                        index === activeIndex ? "bg-muted" : ""
+                      }`}
                     >
                       <span className="font-medium text-foreground">
                         {train.trainNumber} · {train.trainName}

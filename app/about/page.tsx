@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Breadcrumb } from "@/components/seo/Breadcrumb";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 
-const TITLE = "About RailTimer";
+const TITLE = "About";
 const DESCRIPTION =
   "RailTimer is a free, independent tool that calculates exactly when Indian Railways current booking opens for your train, based on the current Railway Board chart-preparation rule.";
 

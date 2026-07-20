@@ -1,7 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { TrainFront } from "lucide-react";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
 import { prisma } from "@/lib/prisma";
+
+export const metadata: Metadata = {
+  title: "Page Not Found",
+  description: "This page doesn't exist — search for a train or head back to RailTimer's homepage.",
+  robots: { index: false, follow: true },
+};
 
 export default async function NotFound() {
   const popularTrains = await prisma.train.findMany({
