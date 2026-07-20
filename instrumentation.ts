@@ -1,6 +1,11 @@
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { LoggerProvider, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
+import type { Logger } from "@opentelemetry/api-logs";
+
+declare global {
+  var __posthogLogger: Logger | undefined;
+}
 
 export function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
@@ -19,7 +24,6 @@ export function register() {
     });
 
     // make the logger available globally
-    (globalThis as any).__posthogLogger = loggerProvider.getLogger("my-nextjs-app");
+    globalThis.__posthogLogger = loggerProvider.getLogger("my-nextjs-app");
   }
 }
-
