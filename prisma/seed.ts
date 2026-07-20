@@ -398,10 +398,84 @@ function extractStationCode(str: string): { name: string; code: string } {
   return { name: str.trim(), code: str.trim().toUpperCase() };
 }
 
+/** RailRadar's bulk index reports "HH:MM:SS" — normalize to "HH:MM" for storage/display. */
+function normalizeTime(time: string | null | undefined): string | null {
+  if (!time) return null;
+  const match = time.match(/^(\d{1,2}):(\d{2})/);
+  return match ? `${match[1].padStart(2, "0")}:${match[2]}` : time;
+}
+
+/**
+ * RailRadar's bulk index "duration" field is unreliable — verified: 100% of
+ * entries read "0h Xm" regardless of actual trip length (an upstream bug
+ * that always reports 0 hours). Derive our own from the two real clock
+ * times instead, assuming a single day-rollover when arrival is earlier
+ * than departure (the overwhelmingly common case for train schedules; see
+ * the same assumption in app/train/[slug]/page.tsx's getEffectiveStops).
+ */
+function estimateDurationFromClockTimes(
+  departureTime: string | null,
+  arrivalTime: string | null,
+): string | null {
+  if (!departureTime || !arrivalTime) return null;
+  const [depH, depM] = departureTime.split(":").map(Number);
+  const [arrH, arrM] = arrivalTime.split(":").map(Number);
+  if ([depH, depM, arrH, arrM].some((n) => Number.isNaN(n))) return null;
+
+  const depMinutes = depH * 60 + depM;
+  let arrMinutes = arrH * 60 + arrM;
+  if (arrMinutes < depMinutes) arrMinutes += 24 * 60;
+  const totalMinutes = arrMinutes - depMinutes;
+
+  return `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
+}
+
+/** Derives a "Xh Ym" duration from first departure and last arrival, accounting for day rollover. */
+function computeDuration(
+  firstDepartureTime: string | null,
+  firstDayNumber: number,
+  lastArrivalTime: string | null,
+  lastDayNumber: number,
+): string | null {
+  if (!firstDepartureTime || !lastArrivalTime) return null;
+  const [depH, depM] = firstDepartureTime.split(":").map(Number);
+  const [arrH, arrM] = lastArrivalTime.split(":").map(Number);
+  if ([depH, depM, arrH, arrM].some((n) => Number.isNaN(n))) return null;
+
+  const depMinutes = depH * 60 + depM;
+  const arrMinutesAbs = (lastDayNumber - firstDayNumber) * 24 * 60 + arrH * 60 + arrM;
+  const totalMinutes = arrMinutesAbs - depMinutes;
+  if (totalMinutes < 0) return null;
+
+  return `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
+}
+
 async function importRailRadarData() {
   const railRadarDir = path.join(process.cwd(), "data", "railradar");
   const dataPath = path.join(railRadarDir, "trains_data.json");
   const indexPath = path.join(railRadarDir, "trains_index.json");
+
+  // Train numbers that appear in both files can carry conflicting
+  // name/route data between sources. trains_data.json has real stop-by-stop
+  // schedules, so it always wins — trains_index.json must not overwrite it.
+  const detailedTrainNumbers = new Set<string>();
+
+  interface RailRadarScheduleStop {
+    code: string;
+    station: string;
+    arr: string;
+    dep: string;
+    day?: number;
+  }
+
+  interface MappedStop {
+    stationCode: string;
+    stationName: string;
+    arrivalTime: string | null;
+    departureTime: string | null;
+    dayNumber: number;
+    sequence: number;
+  }
 
   if (fs.existsSync(dataPath)) {
     console.log("Processing railradardata/trains_data.json...");
@@ -415,17 +489,25 @@ async function importRailRadarData() {
         : DAILY;
       const slug = `${item.number}-${slugify(item.name)}`;
 
-      const stops = (item.schedule || []).map((st: any, idx: number) => ({
-        stationCode: st.code,
-        stationName: st.station,
-        arrivalTime: st.arr === "Source" ? null : st.arr,
-        departureTime: st.dep === "Destination" ? null : st.dep,
-        dayNumber: st.day || 1,
-        sequence: idx + 1,
-      }));
+      const stops: MappedStop[] = (item.schedule || []).map(
+        (st: RailRadarScheduleStop, idx: number) => ({
+          stationCode: st.code,
+          stationName: st.station,
+          arrivalTime: st.arr === "Source" ? null : st.arr,
+          departureTime: st.dep === "Destination" ? null : st.dep,
+          dayNumber: st.day || 1,
+          sequence: idx + 1,
+        }),
+      );
 
       const firstStop = stops[0];
       const lastStop = stops[stops.length - 1];
+      const duration = computeDuration(
+        firstStop?.departureTime ?? null,
+        firstStop?.dayNumber ?? 1,
+        lastStop?.arrivalTime ?? null,
+        lastStop?.dayNumber ?? 1,
+      );
 
       await prisma.train.upsert({
         where: { trainNumber: item.number },
@@ -437,10 +519,10 @@ async function importRailRadarData() {
           runsOn,
           departureTime: firstStop?.departureTime || null,
           arrivalTime: lastStop?.arrivalTime || null,
-          duration: item.totalDistance || null,
+          duration,
           stops: {
             deleteMany: {},
-            create: stops.map((stop: any) => ({
+            create: stops.map((stop) => ({
               stationCode: stop.stationCode,
               stationName: stop.stationName,
               arrivalTime: stop.arrivalTime,
@@ -459,9 +541,9 @@ async function importRailRadarData() {
           runsOn,
           departureTime: firstStop?.departureTime || null,
           arrivalTime: lastStop?.arrivalTime || null,
-          duration: item.totalDistance || null,
+          duration,
           stops: {
-            create: stops.map((stop: any) => ({
+            create: stops.map((stop) => ({
               stationCode: stop.stationCode,
               stationName: stop.stationName,
               arrivalTime: stop.arrivalTime,
@@ -472,6 +554,7 @@ async function importRailRadarData() {
           },
         },
       });
+      detailedTrainNumbers.add(item.number);
       console.log(`Imported detailed schedule for ${item.number} ${item.name}`);
     }
   }
@@ -483,24 +566,43 @@ async function importRailRadarData() {
     const trainNumbers = Object.keys(trainsIndex);
 
     let batchCount = 0;
+    let skippedCount = 0;
     for (const trainNo of trainNumbers) {
       const item = trainsIndex[trainNo];
+      if (detailedTrainNumbers.has(item.number)) {
+        skippedCount++;
+        continue;
+      }
       const fromStation = extractStationCode(item.from || "");
       const toStation = extractStationCode(item.to || "");
       const slug = `${item.number}-${slugify(item.name)}`;
+      const departureTime = normalizeTime(item.departure);
+      const arrivalTime = normalizeTime(item.arrival);
+      const duration = estimateDurationFromClockTimes(departureTime, arrivalTime);
 
       await prisma.train.upsert({
         where: { trainNumber: item.number },
-        update: {},
+        // Only touch index-derived fields; never clobber a richer detailed-
+        // schedule import (trains_data.json, above) that may have already
+        // set stops for this train.
+        update: {
+          trainName: item.name,
+          slug,
+          sourceStation: fromStation.code,
+          destStation: toStation.code,
+          departureTime,
+          arrivalTime,
+          duration,
+        },
         create: {
           trainNumber: item.number,
           trainName: item.name,
           slug,
           sourceStation: fromStation.code,
           destStation: toStation.code,
-          departureTime: item.departure || null,
-          arrivalTime: item.arrival || null,
-          duration: item.duration || null,
+          departureTime,
+          arrivalTime,
+          duration,
           runsOn: DAILY,
         },
       });
@@ -510,7 +612,9 @@ async function importRailRadarData() {
         console.log(`Indexed ${batchCount}/${trainNumbers.length} trains...`);
       }
     }
-    console.log(`Total indexed: ${batchCount} trains.`);
+    console.log(
+      `Total indexed: ${batchCount} trains (${skippedCount} skipped — already covered by a detailed schedule).`,
+    );
   }
 }
 

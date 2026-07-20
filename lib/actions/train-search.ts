@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { formatClockTime } from "@/lib/format";
 
 export interface TrainSearchResult {
   trainNumber: string;
@@ -13,9 +14,13 @@ export interface TrainSearchResult {
 }
 
 /**
- * Lightweight autocomplete over the (currently small) Train table. Plain
- * Prisma read of static schedule data — not part of the RailDataProvider
+ * Lightweight autocomplete over the Train table (5,000+ rows). Plain Prisma
+ * read of static schedule data — not part of the RailDataProvider
  * abstraction, which is reserved for live/unofficial third-party data.
+ *
+ * Uses Train.departureTime directly (always populated, including for
+ * RailRadar-imported trains that don't yet have a Stop breakdown) rather
+ * than joining Stop, which keeps this query cheap at scale.
  */
 export async function searchTrains(query: string): Promise<TrainSearchResult[]> {
   const q = query.trim();
@@ -30,12 +35,6 @@ export async function searchTrains(query: string): Promise<TrainSearchResult[]> 
     },
     take: 8,
     orderBy: { trainName: "asc" },
-    include: {
-      stops: {
-        orderBy: { sequence: "asc" },
-        take: 1,
-      },
-    },
   });
 
   return trains.map((train) => ({
@@ -44,6 +43,6 @@ export async function searchTrains(query: string): Promise<TrainSearchResult[]> 
     slug: train.slug,
     sourceStation: train.sourceStation,
     destStation: train.destStation,
-    departureTime: train.stops[0]?.departureTime ?? null,
+    departureTime: formatClockTime(train.departureTime),
   }));
 }

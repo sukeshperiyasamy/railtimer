@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 import { buildStationFaqs } from "@/lib/station-faq";
 import { TOOLS } from "@/lib/tools-directory";
+import { formatClockTime } from "@/lib/format";
 
 export const revalidate = 3600;
 
@@ -160,7 +161,7 @@ export default async function StationPage({
               href: `/train/${train.slug}`,
               title: `${train.trainNumber} · ${train.trainName}`,
               subtitle: `${train.sourceStation} → ${train.destStation}${
-                train.departureTime ? ` · departs ${train.departureTime}` : ""
+                formatClockTime(train.departureTime) ? ` · departs ${formatClockTime(train.departureTime)}` : ""
               }`,
             }))}
           />

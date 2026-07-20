@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 import { buildTrainFaqs } from "@/lib/train-faq";
 import { TOOLS } from "@/lib/tools-directory";
+import { formatClockTime } from "@/lib/format";
 
 export const revalidate = 3600;
 
@@ -91,15 +92,78 @@ function formatRunningDays(runsOn: string[]): string {
   return runsOn.length >= 7 ? "Daily" : runsOn.join(", ");
 }
 
-function describeTrain(train: TrainWithStops): string {
+interface EffectiveStop {
+  id: string;
+  stationCode: string;
+  stationName: string;
+  arrivalTime: string | null;
+  departureTime: string | null;
+  dayNumber: number;
+}
+
+/**
+ * Many bulk-imported trains only have source/destination summary fields, no
+ * intermediate Stop rows. Rather than rendering an empty schedule, derive an
+ * honest 2-point (origin -> destination) route from the Train's own real
+ * fields — this never fabricates intermediate stops or times.
+ */
+function getEffectiveStops(
+  train: TrainWithStops,
+  stationNames: Map<string, string>,
+): EffectiveStop[] {
+  if (train.stops.length > 0) {
+    return train.stops.map((stop) => ({
+      id: stop.id,
+      stationCode: stop.stationCode,
+      stationName: stop.stationName,
+      arrivalTime: formatClockTime(stop.arrivalTime),
+      departureTime: formatClockTime(stop.departureTime),
+      dayNumber: stop.dayNumber,
+    }));
+  }
+
+  const departureTime = formatClockTime(train.departureTime);
+  const arrivalTime = formatClockTime(train.arrivalTime);
+
+  // Defensible heuristic, not a fabrication: if the arrival clock time is
+  // earlier than the departure clock time, the journey likely crosses
+  // midnight at least once.
+  let destDay = 1;
+  if (departureTime && arrivalTime) {
+    const [depH, depM] = departureTime.split(":").map(Number);
+    const [arrH, arrM] = arrivalTime.split(":").map(Number);
+    if (arrH * 60 + arrM < depH * 60 + depM) destDay = 2;
+  }
+
+  return [
+    {
+      id: "origin",
+      stationCode: train.sourceStation,
+      stationName: stationNames.get(train.sourceStation) ?? train.sourceStation,
+      arrivalTime: null,
+      departureTime,
+      dayNumber: 1,
+    },
+    {
+      id: "destination",
+      stationCode: train.destStation,
+      stationName: stationNames.get(train.destStation) ?? train.destStation,
+      arrivalTime,
+      departureTime: null,
+      dayNumber: destDay,
+    },
+  ];
+}
+
+function describeTrain(train: TrainWithStops, effectiveStops: EffectiveStop[]): string {
   const isPremium = /rajdhani|duronto|shatabdi|vande bharat/i.test(train.trainName);
   const frequency = train.runsOn.length >= 7 ? "daily" : `on ${train.runsOn.join(", ")}`;
-  const intermediateStops = train.stops.slice(1, -1);
+  const intermediateStops = effectiveStops.slice(1, -1);
   const midStop = intermediateStops[Math.floor(intermediateStops.length / 2)];
 
   const overview = `${train.trainName} (${train.trainNumber}) runs ${frequency} between ${train.sourceStation} and ${train.destStation}${
     train.departureTime && train.arrivalTime
-      ? `, departing at ${train.departureTime} and arriving at ${train.arrivalTime}`
+      ? `, departing at ${formatClockTime(train.departureTime)} and arriving at ${formatClockTime(train.arrivalTime)}`
       : ""
   }${train.duration ? `, covering the route in about ${train.duration}` : ""}. ${
     isPremium
@@ -125,7 +189,7 @@ export default async function TrainPage({
   const train = await getTrain(slug);
   if (!train) notFound();
 
-  const [relatedTrains, recentPosts] = await Promise.all([
+  const [relatedTrains, recentPosts, stationRows] = await Promise.all([
     prisma.train.findMany({
       where: {
         id: { not: train.id },
@@ -142,10 +206,21 @@ export default async function TrainPage({
       orderBy: { publishedAt: "desc" },
       take: 3,
     }),
+    train.stops.length === 0
+      ? prisma.station.findMany({
+          where: { code: { in: [train.sourceStation, train.destStation] } },
+          select: { code: true, name: true },
+        })
+      : Promise.resolve([]),
   ]);
 
-  const firstDay = train.stops[0]?.dayNumber ?? 1;
+  const stationNames = new Map(stationRows.map((station) => [station.code, station.name]));
+  const effectiveStops = getEffectiveStops(train, stationNames);
+  const firstDay = effectiveStops[0]?.dayNumber ?? 1;
   const faqs = buildTrainFaqs(train);
+
+  const formattedDeparture = formatClockTime(train.departureTime);
+  const formattedArrival = formatClockTime(train.arrivalTime);
 
   const trainTripJsonLd = {
     "@context": "https://schema.org",
@@ -155,8 +230,8 @@ export default async function TrainPage({
     provider: { "@type": "Organization", name: "Indian Railways" },
     departureStation: { "@type": "TrainStation", name: train.sourceStation },
     arrivalStation: { "@type": "TrainStation", name: train.destStation },
-    ...(train.departureTime ? { departureTime: train.departureTime } : {}),
-    ...(train.arrivalTime ? { arrivalTime: train.arrivalTime } : {}),
+    ...(formattedDeparture ? { departureTime: formattedDeparture } : {}),
+    ...(formattedArrival ? { arrivalTime: formattedArrival } : {}),
   };
 
   const faqJsonLd = {
@@ -195,10 +270,10 @@ export default async function TrainPage({
         {train.trainNumber} {train.trainName}
       </h1>
       <p className="mt-2 text-muted-foreground">
-        {train.departureTime
-          ? `Departs ${train.sourceStation} at ${train.departureTime}`
+        {formattedDeparture
+          ? `Departs ${train.sourceStation} at ${formattedDeparture}`
           : `Departs from ${train.sourceStation}`}
-        {train.arrivalTime ? ` · Arrives ${train.destStation} at ${train.arrivalTime}` : ""}
+        {formattedArrival ? ` · Arrives ${train.destStation} at ${formattedArrival}` : ""}
         {train.duration ? ` · ${train.duration}` : ""} · Runs {formatRunningDays(train.runsOn)}
       </p>
 
@@ -207,7 +282,7 @@ export default async function TrainPage({
           initialTrain={{
             trainNumber: train.trainNumber,
             trainName: train.trainName,
-            departureTime: train.departureTime,
+            departureTime: formattedDeparture,
           }}
           autoCalculate
         />
@@ -217,7 +292,7 @@ export default async function TrainPage({
         <h2 className="text-2xl font-semibold text-foreground">Train route</h2>
         <div className="mt-4 rounded-md border border-border p-4">
           <RouteTimeline
-            stops={train.stops.map((stop) => ({
+            stops={effectiveStops.map((stop) => ({
               stationCode: stop.stationCode,
               stationName: stop.stationName,
               time: stop.departureTime ?? stop.arrivalTime,
@@ -249,11 +324,11 @@ export default async function TrainPage({
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium text-foreground">Departure</TableCell>
-                <TableCell>{train.departureTime ?? "—"}</TableCell>
+                <TableCell>{formattedDeparture ?? "—"}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium text-foreground">Arrival</TableCell>
-                <TableCell>{train.arrivalTime ?? "—"}</TableCell>
+                <TableCell>{formattedArrival ?? "—"}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium text-foreground">Duration</TableCell>
@@ -281,7 +356,7 @@ export default async function TrainPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {train.stops.map((stop) => (
+              {effectiveStops.map((stop) => (
                 <TableRow key={stop.id}>
                   <TableCell>{dayLabel(stop.dayNumber, firstDay)}</TableCell>
                   <TableCell>
@@ -295,11 +370,19 @@ export default async function TrainPage({
             </TableBody>
           </Table>
         </div>
+        {train.stops.length === 0 ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            A detailed intermediate-station schedule isn&apos;t available for this train yet —
+            showing origin and destination only.
+          </p>
+        ) : null}
       </section>
 
       <section className="mt-10 space-y-3">
         <h2 className="text-2xl font-semibold text-foreground">About this train</h2>
-        <p className="leading-relaxed text-muted-foreground">{describeTrain(train)}</p>
+        <p className="leading-relaxed text-muted-foreground">
+          {describeTrain(train, effectiveStops)}
+        </p>
       </section>
 
       <div className="mt-10">

@@ -4,6 +4,7 @@ import { ChartTimeCalculator } from "@/components/tools/ChartTimeCalculator";
 import { prisma } from "@/lib/prisma";
 import { TOOLS } from "@/lib/tools-directory";
 import { excerpt } from "@/lib/blog";
+import { formatClockTime } from "@/lib/format";
 
 export const revalidate = 3600;
 
@@ -29,9 +30,29 @@ const HOME_FAQS = [
   },
 ];
 
+/** Well-known, genuinely higher-demand train categories — used to surface
+ *  recognizable trains on the homepage instead of an arbitrary alphabetical
+ *  slice of 5,000+ trains. */
+const PREMIUM_TRAIN_KEYWORDS = [
+  "rajdhani",
+  "shatabdi",
+  "duronto",
+  "vande bharat",
+  "garib rath",
+  "tejas",
+];
+
 export default async function Home() {
   const [trains, stations, posts] = await Promise.all([
-    prisma.train.findMany({ orderBy: { trainName: "asc" }, take: 8 }),
+    prisma.train.findMany({
+      where: {
+        OR: PREMIUM_TRAIN_KEYWORDS.map((keyword) => ({
+          trainName: { contains: keyword, mode: "insensitive" as const },
+        })),
+      },
+      orderBy: { trainName: "asc" },
+      take: 8,
+    }),
     prisma.station.findMany({ orderBy: { name: "asc" }, take: 8 }),
     prisma.blogPost.findMany({ orderBy: { publishedAt: "desc" }, take: 3 }),
   ]);
@@ -78,7 +99,7 @@ export default async function Home() {
           href: `/train/${train.slug}`,
           title: `${train.trainNumber} · ${train.trainName}`,
           subtitle: `${train.sourceStation} → ${train.destStation}${
-            train.departureTime ? ` · departs ${train.departureTime}` : ""
+            formatClockTime(train.departureTime) ? ` · departs ${formatClockTime(train.departureTime)}` : ""
           }`,
         }))}
       />
