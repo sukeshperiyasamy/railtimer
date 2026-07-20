@@ -149,7 +149,7 @@ export function ChartTimeCalculator({ initialTrain, autoCalculate = false }: Cha
     const text = `${trainLabel}: first chart ${formatDateTime(result.firstChartTime)}, current booking opens ${formatDateTime(result.currentBookingOpensAt)}. Check yours on RailTimer.`;
     const url =
       typeof window !== "undefined"
-        ? `${window.location.origin}/tools/chart-time-calculator`
+        ? `${window.location.origin}/tools/current-booking-calculator`
         : undefined;
 
     if (typeof navigator !== "undefined" && navigator.share) {

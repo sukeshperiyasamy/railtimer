@@ -3,7 +3,7 @@ import Link from "next/link";
 const FOOTER_LINKS = [
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
-  { href: "/tools/chart-time-calculator", label: "Chart Time Calculator" },
+  { href: "/tools/current-booking-calculator", label: "Current Booking Calculator" },
   { href: "/privacy-policy", label: "Privacy Policy" },
   { href: "/terms", label: "Terms" },
 ];

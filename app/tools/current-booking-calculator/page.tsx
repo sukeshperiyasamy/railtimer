@@ -5,13 +5,13 @@ import { AdSlot } from "@/components/ads/AdSlot";
 import { ChartTimeCalculator } from "@/components/tools/ChartTimeCalculator";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 
-const PAGE_PATH = "/tools/chart-time-calculator";
+const PAGE_PATH = "/tools/current-booking-calculator";
 const PAGE_URL = `${SITE_URL}${PAGE_PATH}`;
 const LAST_VERIFIED = "20 July 2026";
 
-const TITLE = "Chart Preparation Time Calculator — When Does Current Booking Open?";
+const TITLE = "Current Booking Calculator — Chart Preparation Time & Countdown";
 const DESCRIPTION =
-  "Calculate exactly when your train's chart will be prepared and current booking opens. Free tool for Indian Railways passengers — no login required.";
+  "Free Current Booking Calculator for Indian Railways. See your train's exact chart preparation time, a live countdown, and the rule used — no login required.";
 
 export function generateMetadata(): Metadata {
   return {
@@ -82,11 +82,11 @@ function jsonLd(data: Record<string, unknown>) {
   return { __html: JSON.stringify(data) };
 }
 
-export default function ChartTimeCalculatorPage() {
+export default function CurrentBookingCalculatorPage() {
   const webApplicationJsonLd = {
     "@context": "https://schema.org",
     "@type": "WebApplication",
-    name: "Train Chart Preparation Time Calculator",
+    name: "Current Booking Calculator",
     description: DESCRIPTION,
     url: PAGE_URL,
     applicationCategory: "UtilitiesApplication",
@@ -117,7 +117,7 @@ export default function ChartTimeCalculatorPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={jsonLd(faqJsonLd)} />
 
       <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-        Train Chart Preparation Time Calculator — When Does Current Booking Open?
+        Current Booking Calculator — When Does Chart Preparation Happen?
       </h1>
 
       <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
