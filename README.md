@@ -1,16 +1,11 @@
 # RailTimer
 
 An SEO-optimized, ad-monetized information site for Indian Railways passengers —
-train schedules, routes, PNR status, chart-preparation countdowns, and running
-status. Built for programmatic scale (thousands of train/route pages) without
-shipping thin, auto-generated-looking pages.
+train schedules, routes, PNR status, chart-preparation countdowns, and live running
+status. Built for programmatic scale (thousands of train/route pages) with real-time data and high-performance caching.
 
-> **Status:** early build. Core architecture (data layer, layout shell, ad
-> component) is in place, Supabase is connected with 8 real seeded trains,
-> and the chart-preparation time calculator ([`/tools/chart-time-calculator`](app/tools/chart-time-calculator/page.tsx))
-> is fully built and verified. Homepage, train/route page templates, and the
-> PNR status tool are still to come. Live train data still runs against a
-> mock provider — no rail-data API key configured yet.
+> **Status:** Live & Production Ready. Live Supabase PostgreSQL database connected,
+> live RailRadar API integrated (`https://api.railradar.in/v1`), automated daily data collection active via Vercel Cron, Google AdSense (`ads.txt`) configured, and Vercel Analytics enabled.
 
 ## Tech stack
 
@@ -18,74 +13,86 @@ shipping thin, auto-generated-looking pages.
 |---|---|
 | Framework | Next.js 15 (App Router, Server Components, TypeScript strict) |
 | Styling | Tailwind CSS v4 + shadcn/ui |
-| Database | Supabase (PostgreSQL) via Prisma 6 |
+| Database | Supabase (PostgreSQL) via Prisma 6 (Shared Pooler in `ap-south-1`) |
+| Data Provider | RailRadar Live API (`api.railradar.in/v1`) |
 | Caching | Upstash Redis (serverless), cache-first reads for live train data |
-| Validation | Zod — every external API response is parsed before it enters app code |
-| Hosting | Vercel, ISR for train/route pages |
+| Validation | Zod — every external API response is parsed before entering app code |
+| Analytics & Ads | Vercel Analytics + Google AdSense (`public/ads.txt` verified) |
+| Deployment | Vercel with Automated Daily Cron Sync |
 
 ## Getting started
 
 ```bash
 npm install
-cp .env.example .env   # fill in real values as you get accounts; placeholders work for local dev
+cp .env.example .env   # fill in real values for Supabase and RailRadar
 npx prisma generate
 npm run dev
 ```
 
-The app runs at [http://localhost:3000](http://localhost:3000). Live train
-data (PNR status, running status, availability) is served by a deterministic
-mock provider until a real rail-data API key is configured — see
-[`lib/rail-data-provider.ts`](lib/rail-data-provider.ts).
+The app runs at [http://localhost:3000](http://localhost:3000). Live deployment is active at [https://railtimer.vercel.app](https://railtimer.vercel.app).
 
 ## Project structure
 
-```
-/app
-  page.tsx                  homepage
-  layout.tsx                 root layout (Header/Footer, fonts, metadata)
-  globals.css                 design tokens (Tailwind v4 @theme)
-/components
-  ui/                        shadcn/ui primitives
-  ads/AdSlot.tsx              reusable ad unit — reserves height to avoid CLS
-  layout/Header.tsx            site header + mobile nav
-  layout/Footer.tsx            footer with unofficial-site disclaimer
-  layout/MobileNav.tsx         client-side mobile menu toggle
-  train/                      train-specific components (in progress)
-/lib
-  rail-data-provider.ts       single abstraction over external rail-data APIs
-  prisma.ts                   Prisma client singleton
-  redis.ts                    Upstash client + cache-first `cached()` helper
-  schemas/rail-data.ts         Zod schemas for PNR/running-status/availability
-/prisma
-  schema.prisma                Train, Stop, BlogPost models
+```text
+railtimer/
+├── app/                        # Next.js 15 App Router pages & API routes
+│   ├── api/
+│   │   └── cron/
+│   │       └── sync-trains/    # Vercel daily automated data sync cron route
+│   ├── blog/                   # SEO blog post pages
+│   ├── station/[code]/         # Dynamic station route pages
+│   ├── train/[slug]/           # Dynamic train schedule & tracking pages
+│   ├── layout.tsx              # Root layout (Header, Footer, Analytics)
+│   └── page.tsx                # Homepage & train search interface
+│
+├── components/                 # UI components & primitives
+│   ├── ads/
+│   │   └── AdSlot.tsx          # Google AdSense unit with reserved CLS height
+│   ├── layout/                 # Site Header, Footer, and MobileNav
+│   └── ui/                     # shadcn/ui primitives
+│
+├── data/                       # Structured static data & datasets
+│   └── railradar/
+│       ├── trains_data.json    # Complete train schedule dataset
+│       └── trains_index.json   # Full Indian Railways train registry
+│
+├── lib/                        # Core application services & clients
+│   ├── prisma.ts               # Prisma Client singleton
+│   ├── redis.ts                # Upstash Redis caching layer
+│   ├── rail-data-provider.ts   # Live RailRadar API client & mock fallbacks
+│   └── schemas/                # Zod validation schemas
+│
+├── prisma/                     # Database migrations & seed scripts
+│   ├── migrations/             # Version-controlled migration history
+│   ├── schema.prisma           # Database schema (Train, Stop, BlogPost)
+│   └── seed.ts                 # Database seed script for Supabase
+│
+├── public/                     # Static assets & verification files
+│   ├── ads.txt                 # Google AdSense publisher verification file
+│   └── favicon.ico
+│
+├── scripts/                    # Automation & test CLI scripts
+│   └── test-sync.ts            # Live API fetch & DB upsert test runner
+│
+├── .env                        # Local environment variables
+├── package.json                # Project dependencies & scripts
+└── vercel.json                 # Vercel deployment & cron schedule config
 ```
 
 ## Architecture notes
 
-- **`RailDataProvider` is the only door to external rail data.** No page or
-  component should import an HTTP client directly — these APIs are
-  unofficial and can change without notice. `getRailDataProvider()` returns a
-  Redis-cached, Zod-validated implementation; swapping the mock for a real
-  provider only touches `lib/rail-data-provider.ts`.
-- **Two Postgres connection strings.** `DATABASE_URL` is the pooled
-  (PgBouncer) connection used at runtime; `DIRECT_URL` is used only for
-  Prisma migrations. Both are set in `prisma/schema.prisma`'s `datasource`
-  block.
-- **Ad placement is deliberate, not decorative.** `AdSlot` reserves a fixed
-  min-height per format before the ad script loads (prevents layout shift),
-  and dedupes the AdSense loader script across instances via a fixed
-  `next/script` id. Pages should never stack two slots back-to-back or
-  sandwich a live data widget between them — max 2-3 slots per page.
-- **Content over data dumps.** Every train/route page is required to carry a
-  150-250 word written section (route overview, tips) alongside the live
-  widget and schedule table — thin auto-generated pages risk both AdSense
-  rejection and Search penalties.
+- **`RailDataProvider` is the single door to external rail data.** All components, pages, and API routes call `getRailDataProvider()`, which connects to `https://api.railradar.in/v1` when `RAIL_DATA_API_KEY` is present, wrapped with Upstash Redis caching and Zod validation.
+- **Supabase Database & Prisma Migrations.** `DATABASE_URL` uses the shared pooler (`aws-1-ap-south-1.pooler.supabase.com:6543`) for runtime connections, and `DIRECT_URL` handles migrations.
+- **Automated Data Collection.** Vercel Cron (`vercel.json`) automatically triggers `/api/cron/sync-trains` at midnight (`0 0 * * *`) to fetch live running statuses and sync priority train data into Supabase.
+- **Google AdSense & CLS Protection.** `AdSlot` pre-reserves unit heights before scripts load to prevent Cumulative Layout Shift (CLS), backed by `public/ads.txt` for publisher verification.
 
 ## Environment variables
 
-See [`.env.example`](.env.example) for the full list (Supabase, Upstash,
-rail-data API, GA4, Clarity, AdSense). Nothing beyond local Postgres
-placeholders is required to run the app today.
+See [`.env.example`](.env.example) for the full list:
+- `DATABASE_URL` & `DIRECT_URL` (Supabase PostgreSQL pooler)
+- `NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `RAIL_DATA_API_KEY` & `RAIL_DATA_API_BASE_URL` (RailRadar API)
+- `NEXT_PUBLIC_ADSENSE_CLIENT_ID` (Google AdSense)
 
 ## Scripts
 
@@ -94,5 +101,6 @@ npm run dev      # start dev server
 npm run build    # production build
 npm run start    # run the production build
 npm run lint     # eslint
-npx tsc --noEmit # typecheck
+npm run db:seed  # seed Supabase database with RailRadar dataset
+npx tsx scripts/test-sync.ts # test live API fetch and DB persistence
 ```
