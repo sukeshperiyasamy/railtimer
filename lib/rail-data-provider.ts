@@ -172,20 +172,156 @@ class CachingRailDataProvider implements RailDataProvider {
   }
 }
 
+class RailRadarDataProvider implements RailDataProvider {
+  constructor(
+    private readonly apiKey: string,
+    private readonly baseUrl: string = "https://api.railradar.in/v1",
+  ) {}
+
+  private get headers() {
+    return {
+      Authorization: `Bearer ${this.apiKey}`,
+      "Content-Type": "application/json",
+    };
+  }
+
+  async getPnrStatus(pnr: string): Promise<PnrStatus> {
+    try {
+      const res = await fetch(`${this.baseUrl}/pnr/${pnr}`, {
+        headers: this.headers,
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) return pnrStatusSchema.parse(json.data);
+      }
+    } catch (err) {
+      console.warn(`[RailRadar Live PNR Fallback for ${pnr}]:`, err);
+    }
+    return new MockRailDataProvider().getPnrStatus(pnr);
+  }
+
+  async getTrainRunningStatus(
+    trainNumber: string,
+    date: string,
+  ): Promise<RunningStatus> {
+    try {
+      const res = await fetch(
+        `${this.baseUrl}/trains/${trainNumber}/live?date=${date}`,
+        { headers: this.headers },
+      );
+      if (res.ok) {
+        const json = await res.json();
+
+        const raw = json.data || json;
+        const scheduleArray = Array.isArray(raw.route)
+          ? raw.route
+          : Array.isArray(raw.schedule)
+            ? raw.schedule
+            : Array.isArray(raw.stops)
+              ? raw.stops
+              : [];
+
+        let statusEnum: "not-started" | "running" | "delayed" | "cancelled" | "completed" = "running";
+        if (typeof raw.status === "string") {
+          const s = raw.status.toLowerCase();
+          if (s.includes("complete") || s.includes("finish") || s.includes("arrived")) {
+            statusEnum = "completed";
+          } else if (s.includes("cancel")) {
+            statusEnum = "cancelled";
+          } else if (s.includes("delay")) {
+            statusEnum = "delayed";
+          } else if (s.includes("not") || s.includes("upcoming")) {
+            statusEnum = "not-started";
+          }
+        } else if (raw.delay > 15) {
+          statusEnum = "delayed";
+        }
+
+        const normalized = {
+          trainNumber: String(raw.trainNumber || raw.number || trainNumber),
+          trainName: String(raw.trainName || raw.name || "Train " + trainNumber),
+          date: String(raw.date || date),
+          status: statusEnum,
+          delayMinutes: Math.round(Number(raw.delayMinutes ?? raw.delay ?? 0)),
+          currentStationCode:
+            raw.currentStationCode ||
+            raw.currentStation ||
+            raw.current_station ||
+            null,
+          lastUpdatedAt: new Date().toISOString(),
+          stops: scheduleArray.map((s: Record<string, unknown>) => ({
+            stationCode: String(s.stationCode || s.code || "UNKNOWN"),
+            stationName: String(s.stationName || s.station || "Station"),
+            scheduledArrival: s.scheduledArrival ? String(s.scheduledArrival).slice(11, 16) : (s.arr as string) || null,
+            actualArrival: s.actualArrival ? String(s.actualArrival).slice(11, 16) : (s.arr as string) || null,
+            scheduledDeparture: s.scheduledDeparture ? String(s.scheduledDeparture).slice(11, 16) : (s.dep as string) || null,
+            actualDeparture: s.actualDeparture ? String(s.actualDeparture).slice(11, 16) : (s.dep as string) || null,
+            distanceKm: Math.max(0, parseFloat((s.distance || s.distanceKm || s.dist || "0") as string) || 0),
+            dayNumber: Math.max(1, parseInt((s.arrivalDay || s.departureDay || s.dayNumber || s.day || "1") as string) || 1),
+            hasDeparted: s.status === "completed" || Boolean(s.hasDeparted ?? s.departed),
+          })),
+        };
+
+        if (normalized.stops.length === 0) {
+          throw new Error("No stops in RailRadar live response schedule");
+        }
+
+        return runningStatusSchema.parse(normalized);
+      }
+    } catch (err) {
+      console.warn(
+        `[RailRadar Live Running Status Fallback for ${trainNumber}]:`,
+        err,
+      );
+    }
+    return new MockRailDataProvider().getTrainRunningStatus(trainNumber, date);
+  }
+
+  async getCurrentAvailability(
+    trainNumber: string,
+    date: string,
+    travelClass: string,
+  ): Promise<Availability> {
+    try {
+      const res = await fetch(
+        `${this.baseUrl}/trains/${trainNumber}/availability?date=${date}&class=${travelClass}`,
+        { headers: this.headers },
+      );
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) return availabilitySchema.parse(json.data);
+      }
+    } catch (err) {
+      console.warn(
+        `[RailRadar Live Availability Fallback for ${trainNumber}]:`,
+        err,
+      );
+    }
+    return new MockRailDataProvider().getCurrentAvailability(
+      trainNumber,
+      date,
+      travelClass,
+    );
+  }
+}
+
 let providerSingleton: RailDataProvider | undefined;
 
 /**
  * Single entry point for the rest of the app — pages, components, and API
  * routes must call this instead of instantiating a provider directly.
- *
- * TODO: once a real provider is chosen and RAIL_DATA_API_KEY /
- * RAIL_DATA_API_BASE_URL are set, replace `new MockRailDataProvider()` with
- * an HTTP-backed implementation of RailDataProvider. Nothing outside this
- * file needs to change.
  */
 export function getRailDataProvider(): RailDataProvider {
   if (!providerSingleton) {
-    const base = new MockRailDataProvider();
+    const apiKey =
+      process.env.RAIL_DATA_API_KEY || process.env.RAILRADAR_API_KEY;
+    const baseUrl =
+      process.env.RAIL_DATA_API_BASE_URL || "https://api.railradar.in/v1";
+
+    const base = apiKey
+      ? new RailRadarDataProvider(apiKey, baseUrl)
+      : new MockRailDataProvider();
+
     providerSingleton = new CachingRailDataProvider(base);
   }
   return providerSingleton;

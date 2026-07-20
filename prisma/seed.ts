@@ -399,7 +399,7 @@ function extractStationCode(str: string): { name: string; code: string } {
 }
 
 async function importRailRadarData() {
-  const railRadarDir = path.join(process.cwd(), "railradardata");
+  const railRadarDir = path.join(process.cwd(), "data", "railradar");
   const dataPath = path.join(railRadarDir, "trains_data.json");
   const indexPath = path.join(railRadarDir, "trains_index.json");
 
