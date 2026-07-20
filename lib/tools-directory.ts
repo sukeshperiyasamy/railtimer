@@ -14,6 +14,12 @@ export const TOOLS: ToolLink[] = [
     status: "live",
   },
   {
+    href: "/tools/running-status",
+    title: "Live Train Running Status",
+    subtitle: "Current location, delay, and station-by-station times",
+    status: "live",
+  },
+  {
     href: "/tools/chart-preparation-time",
     title: "Chart Preparation Calculator",
     subtitle: "Deep-dive on first vs. final chart timing",

@@ -5,6 +5,7 @@ import { GlobalSearch } from "./GlobalSearch";
 
 const NAV_LINKS = [
   { href: "/tools/current-booking-calculator", label: "Current Booking Calculator" },
+  { href: "/tools/running-status", label: "Running Status" },
   { href: "/blog", label: "Blog" },
   { href: "/about", label: "About" },
 ];

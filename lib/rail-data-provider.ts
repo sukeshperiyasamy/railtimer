@@ -186,95 +186,95 @@ class RailRadarDataProvider implements RailDataProvider {
   }
 
   async getPnrStatus(pnr: string): Promise<PnrStatus> {
-    try {
-      const res = await fetch(`${this.baseUrl}/pnr/${pnr}`, {
-        headers: this.headers,
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.data) return pnrStatusSchema.parse(json.data);
-      }
-    } catch (err) {
-      console.warn(`[RailRadar Live PNR Fallback for ${pnr}]:`, err);
+    // No silent fallback to mock data here: a PNR lookup is a factual claim
+    // about a real passenger's real ticket. If the upstream API fails, the
+    // caller must see a real error, not a fabricated-but-plausible result.
+    const res = await fetch(`${this.baseUrl}/pnr/${pnr}`, {
+      headers: this.headers,
+    });
+    if (!res.ok) {
+      throw new Error(`RailRadar PNR lookup failed (HTTP ${res.status}) for ${pnr}`);
     }
-    return new MockRailDataProvider().getPnrStatus(pnr);
+    const json = await res.json();
+    if (!json.data) {
+      throw new Error(`RailRadar PNR lookup returned no data for ${pnr}`);
+    }
+    return pnrStatusSchema.parse(json.data);
   }
 
   async getTrainRunningStatus(
     trainNumber: string,
     date: string,
   ): Promise<RunningStatus> {
-    try {
-      const res = await fetch(
-        `${this.baseUrl}/trains/${trainNumber}/live?date=${date}`,
-        { headers: this.headers },
-      );
-      if (res.ok) {
-        const json = await res.json();
-
-        const raw = json.data || json;
-        const scheduleArray = Array.isArray(raw.route)
-          ? raw.route
-          : Array.isArray(raw.schedule)
-            ? raw.schedule
-            : Array.isArray(raw.stops)
-              ? raw.stops
-              : [];
-
-        let statusEnum: "not-started" | "running" | "delayed" | "cancelled" | "completed" = "running";
-        if (typeof raw.status === "string") {
-          const s = raw.status.toLowerCase();
-          if (s.includes("complete") || s.includes("finish") || s.includes("arrived")) {
-            statusEnum = "completed";
-          } else if (s.includes("cancel")) {
-            statusEnum = "cancelled";
-          } else if (s.includes("delay")) {
-            statusEnum = "delayed";
-          } else if (s.includes("not") || s.includes("upcoming")) {
-            statusEnum = "not-started";
-          }
-        } else if (raw.delay > 15) {
-          statusEnum = "delayed";
-        }
-
-        const normalized = {
-          trainNumber: String(raw.trainNumber || raw.number || trainNumber),
-          trainName: String(raw.trainName || raw.name || "Train " + trainNumber),
-          date: String(raw.date || date),
-          status: statusEnum,
-          delayMinutes: Math.round(Number(raw.delayMinutes ?? raw.delay ?? 0)),
-          currentStationCode:
-            raw.currentStationCode ||
-            raw.currentStation ||
-            raw.current_station ||
-            null,
-          lastUpdatedAt: new Date().toISOString(),
-          stops: scheduleArray.map((s: Record<string, unknown>) => ({
-            stationCode: String(s.stationCode || s.code || "UNKNOWN"),
-            stationName: String(s.stationName || s.station || "Station"),
-            scheduledArrival: s.scheduledArrival ? String(s.scheduledArrival).slice(11, 16) : (s.arr as string) || null,
-            actualArrival: s.actualArrival ? String(s.actualArrival).slice(11, 16) : (s.arr as string) || null,
-            scheduledDeparture: s.scheduledDeparture ? String(s.scheduledDeparture).slice(11, 16) : (s.dep as string) || null,
-            actualDeparture: s.actualDeparture ? String(s.actualDeparture).slice(11, 16) : (s.dep as string) || null,
-            distanceKm: Math.max(0, parseFloat((s.distance || s.distanceKm || s.dist || "0") as string) || 0),
-            dayNumber: Math.max(1, parseInt((s.arrivalDay || s.departureDay || s.dayNumber || s.day || "1") as string) || 1),
-            hasDeparted: s.status === "completed" || Boolean(s.hasDeparted ?? s.departed),
-          })),
-        };
-
-        if (normalized.stops.length === 0) {
-          throw new Error("No stops in RailRadar live response schedule");
-        }
-
-        return runningStatusSchema.parse(normalized);
-      }
-    } catch (err) {
-      console.warn(
-        `[RailRadar Live Running Status Fallback for ${trainNumber}]:`,
-        err,
+    // No silent fallback to mock data: a running-status result is a factual
+    // claim about where a real train is right now. If the upstream API
+    // fails, the caller must see a real error, not a fabricated result.
+    const res = await fetch(
+      `${this.baseUrl}/trains/${trainNumber}/live?date=${date}`,
+      { headers: this.headers },
+    );
+    if (!res.ok) {
+      throw new Error(
+        `RailRadar running-status lookup failed (HTTP ${res.status}) for ${trainNumber}`,
       );
     }
-    return new MockRailDataProvider().getTrainRunningStatus(trainNumber, date);
+    const json = await res.json();
+
+    const raw = json.data || json;
+    const scheduleArray = Array.isArray(raw.route)
+      ? raw.route
+      : Array.isArray(raw.schedule)
+        ? raw.schedule
+        : Array.isArray(raw.stops)
+          ? raw.stops
+          : [];
+
+    let statusEnum: "not-started" | "running" | "delayed" | "cancelled" | "completed" = "running";
+    if (typeof raw.status === "string") {
+      const s = raw.status.toLowerCase();
+      if (s.includes("complete") || s.includes("finish") || s.includes("arrived")) {
+        statusEnum = "completed";
+      } else if (s.includes("cancel")) {
+        statusEnum = "cancelled";
+      } else if (s.includes("delay")) {
+        statusEnum = "delayed";
+      } else if (s.includes("not") || s.includes("upcoming")) {
+        statusEnum = "not-started";
+      }
+    } else if (raw.delay > 15) {
+      statusEnum = "delayed";
+    }
+
+    const normalized = {
+      trainNumber: String(raw.trainNumber || raw.number || trainNumber),
+      trainName: String(raw.trainName || raw.name || "Train " + trainNumber),
+      date: String(raw.date || date),
+      status: statusEnum,
+      delayMinutes: Math.round(Number(raw.delayMinutes ?? raw.delay ?? 0)),
+      currentStationCode:
+        raw.currentStationCode ||
+        raw.currentStation ||
+        raw.current_station ||
+        null,
+      lastUpdatedAt: new Date().toISOString(),
+      stops: scheduleArray.map((s: Record<string, unknown>) => ({
+        stationCode: String(s.stationCode || s.code || "UNKNOWN"),
+        stationName: String(s.stationName || s.station || "Station"),
+        scheduledArrival: s.scheduledArrival ? String(s.scheduledArrival).slice(11, 16) : (s.arr as string) || null,
+        actualArrival: s.actualArrival ? String(s.actualArrival).slice(11, 16) : (s.arr as string) || null,
+        scheduledDeparture: s.scheduledDeparture ? String(s.scheduledDeparture).slice(11, 16) : (s.dep as string) || null,
+        actualDeparture: s.actualDeparture ? String(s.actualDeparture).slice(11, 16) : (s.dep as string) || null,
+        distanceKm: Math.max(0, parseFloat((s.distance || s.distanceKm || s.dist || "0") as string) || 0),
+        dayNumber: Math.max(1, parseInt((s.arrivalDay || s.departureDay || s.dayNumber || s.day || "1") as string) || 1),
+        hasDeparted: s.status === "completed" || Boolean(s.hasDeparted ?? s.departed),
+      })),
+    };
+
+    if (normalized.stops.length === 0) {
+      throw new Error("No stops in RailRadar live response schedule");
+    }
+
+    return runningStatusSchema.parse(normalized);
   }
 
   async getCurrentAvailability(
@@ -282,26 +282,22 @@ class RailRadarDataProvider implements RailDataProvider {
     date: string,
     travelClass: string,
   ): Promise<Availability> {
-    try {
-      const res = await fetch(
-        `${this.baseUrl}/trains/${trainNumber}/availability?date=${date}&class=${travelClass}`,
-        { headers: this.headers },
-      );
-      if (res.ok) {
-        const json = await res.json();
-        if (json.data) return availabilitySchema.parse(json.data);
-      }
-    } catch (err) {
-      console.warn(
-        `[RailRadar Live Availability Fallback for ${trainNumber}]:`,
-        err,
+    // No silent fallback to mock data: a fabricated "seats available" result
+    // could send someone to a station for a berth that was never real.
+    const res = await fetch(
+      `${this.baseUrl}/trains/${trainNumber}/availability?date=${date}&class=${travelClass}`,
+      { headers: this.headers },
+    );
+    if (!res.ok) {
+      throw new Error(
+        `RailRadar availability lookup failed (HTTP ${res.status}) for ${trainNumber}`,
       );
     }
-    return new MockRailDataProvider().getCurrentAvailability(
-      trainNumber,
-      date,
-      travelClass,
-    );
+    const json = await res.json();
+    if (!json.data) {
+      throw new Error(`RailRadar availability lookup returned no data for ${trainNumber}`);
+    }
+    return availabilitySchema.parse(json.data);
   }
 }
 
