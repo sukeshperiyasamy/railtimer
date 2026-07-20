@@ -378,8 +378,145 @@ async function backfillStations() {
   console.log(`Backfilled ${uniqueStations.size} stations`);
 }
 
+import fs from "node:fs";
+import path from "node:path";
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function extractStationCode(str: string): { name: string; code: string } {
+  const match = str.match(/(.*?)\s*\(([^)]+)\)$/);
+  if (match) {
+    return { name: match[1].trim(), code: match[2].trim().toUpperCase() };
+  }
+  return { name: str.trim(), code: str.trim().toUpperCase() };
+}
+
+async function importRailRadarData() {
+  const railRadarDir = path.join(process.cwd(), "railradardata");
+  const dataPath = path.join(railRadarDir, "trains_data.json");
+  const indexPath = path.join(railRadarDir, "trains_index.json");
+
+  if (fs.existsSync(dataPath)) {
+    console.log("Processing railradardata/trains_data.json...");
+    const rawData = fs.readFileSync(dataPath, "utf-8");
+    const trainsData = JSON.parse(rawData);
+
+    for (const trainNo of Object.keys(trainsData)) {
+      const item = trainsData[trainNo];
+      const runsOn = item.runsOn
+        ? item.runsOn.split(",").map((s: string) => s.trim())
+        : DAILY;
+      const slug = `${item.number}-${slugify(item.name)}`;
+
+      const stops = (item.schedule || []).map((st: any, idx: number) => ({
+        stationCode: st.code,
+        stationName: st.station,
+        arrivalTime: st.arr === "Source" ? null : st.arr,
+        departureTime: st.dep === "Destination" ? null : st.dep,
+        dayNumber: st.day || 1,
+        sequence: idx + 1,
+      }));
+
+      const firstStop = stops[0];
+      const lastStop = stops[stops.length - 1];
+
+      await prisma.train.upsert({
+        where: { trainNumber: item.number },
+        update: {
+          trainName: item.name,
+          slug,
+          sourceStation: firstStop?.stationCode || "SRC",
+          destStation: lastStop?.stationCode || "DEST",
+          runsOn,
+          departureTime: firstStop?.departureTime || null,
+          arrivalTime: lastStop?.arrivalTime || null,
+          duration: item.totalDistance || null,
+          stops: {
+            deleteMany: {},
+            create: stops.map((stop: any) => ({
+              stationCode: stop.stationCode,
+              stationName: stop.stationName,
+              arrivalTime: stop.arrivalTime,
+              departureTime: stop.departureTime,
+              dayNumber: stop.dayNumber,
+              sequence: stop.sequence,
+            })),
+          },
+        },
+        create: {
+          trainNumber: item.number,
+          trainName: item.name,
+          slug,
+          sourceStation: firstStop?.stationCode || "SRC",
+          destStation: lastStop?.stationCode || "DEST",
+          runsOn,
+          departureTime: firstStop?.departureTime || null,
+          arrivalTime: lastStop?.arrivalTime || null,
+          duration: item.totalDistance || null,
+          stops: {
+            create: stops.map((stop: any) => ({
+              stationCode: stop.stationCode,
+              stationName: stop.stationName,
+              arrivalTime: stop.arrivalTime,
+              departureTime: stop.departureTime,
+              dayNumber: stop.dayNumber,
+              sequence: stop.sequence,
+            })),
+          },
+        },
+      });
+      console.log(`Imported detailed schedule for ${item.number} ${item.name}`);
+    }
+  }
+
+  if (fs.existsSync(indexPath)) {
+    console.log("Processing railradardata/trains_index.json...");
+    const rawIndex = fs.readFileSync(indexPath, "utf-8");
+    const trainsIndex = JSON.parse(rawIndex);
+    const trainNumbers = Object.keys(trainsIndex);
+
+    let batchCount = 0;
+    for (const trainNo of trainNumbers) {
+      const item = trainsIndex[trainNo];
+      const fromStation = extractStationCode(item.from || "");
+      const toStation = extractStationCode(item.to || "");
+      const slug = `${item.number}-${slugify(item.name)}`;
+
+      await prisma.train.upsert({
+        where: { trainNumber: item.number },
+        update: {},
+        create: {
+          trainNumber: item.number,
+          trainName: item.name,
+          slug,
+          sourceStation: fromStation.code,
+          destStation: toStation.code,
+          departureTime: item.departure || null,
+          arrivalTime: item.arrival || null,
+          duration: item.duration || null,
+          runsOn: DAILY,
+        },
+      });
+
+      batchCount++;
+      if (batchCount % 100 === 0) {
+        console.log(`Indexed ${batchCount}/${trainNumbers.length} trains...`);
+      }
+    }
+    console.log(`Total indexed: ${batchCount} trains.`);
+  }
+}
+
 main()
   .then(async () => {
+    await importRailRadarData();
     await prisma.$disconnect();
   })
   .catch(async (e) => {
@@ -387,3 +524,4 @@ main()
     await prisma.$disconnect();
     process.exit(1);
   });
+

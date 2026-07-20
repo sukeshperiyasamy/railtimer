@@ -1,0 +1,67 @@
+{
+  "12951": {
+    "number": "12951",
+    "name": "Mumbai Central - New Delhi Tejas Rajdhani Express",
+    "route": "MMCT ➔ NDLS",
+    "runsOn": "Sun, Mon, Tue, Wed, Thu, Fri, Sat",
+    "classes": "1A, 2A, 3A",
+    "totalDistance": "1386 km",
+    "schedule": [
+      { "sn": 1, "station": "Mumbai Central", "code": "MMCT", "arr": "Source", "dep": "17:00", "halt": "--", "dist": "0 km", "day": 1 },
+      { "sn": 2, "station": "Borivali", "code": "BVI", "arr": "17:22", "dep": "17:24", "halt": "2 min", "dist": "30 km", "day": 1 },
+      { "sn": 3, "station": "Surat", "code": "ST", "arr": "19:43", "dep": "19:48", "halt": "5 min", "dist": "263 km", "day": 1 },
+      { "sn": 4, "station": "Vadodara Junction", "code": "BRC", "arr": "21:16", "dep": "21:26", "halt": "10 min", "dist": "393 km", "day": 1 },
+      { "sn": 5, "station": "Ratlam Junction", "code": "RTM", "arr": "00:55", "dep": "00:58", "halt": "3 min", "dist": "654 km", "day": 2 },
+      { "sn": 6, "station": "Kota Junction", "code": "KOTA", "arr": "03:55", "dep": "04:05", "halt": "10 min", "dist": "920 km", "day": 2 },
+      { "sn": 7, "station": "New Delhi", "code": "NDLS", "arr": "08:32", "dep": "Destination", "halt": "--", "dist": "1386 km", "day": 2 }
+    ]
+  },
+  "22436": {
+    "number": "22436",
+    "name": "New Delhi - Varanasi Vande Bharat Express",
+    "route": "NDLS ➔ BSB",
+    "runsOn": "Sun, Mon, Tue, Thu, Fri, Sat",
+    "classes": "CC, EC",
+    "totalDistance": "759 km",
+    "schedule": [
+      { "sn": 1, "station": "New Delhi", "code": "NDLS", "arr": "Source", "dep": "06:00", "halt": "--", "dist": "0 km", "day": 1 },
+      { "sn": 2, "station": "Kanpur Central", "code": "CNB", "arr": "10:08", "dep": "10:10", "halt": "2 min", "dist": "440 km", "day": 1 },
+      { "sn": 3, "station": "Prayagraj Junction", "code": "PRYJ", "arr": "12:08", "dep": "12:10", "halt": "2 min", "dist": "635 km", "day": 1 },
+      { "sn": 4, "station": "Varanasi Junction", "code": "BSB", "arr": "14:00", "dep": "Destination", "halt": "--", "dist": "759 km", "day": 1 }
+    ]
+  },
+  "12002": {
+    "number": "12002",
+    "name": "New Delhi - Rani Kamalapati Shatabdi Express",
+    "route": "NDLS ➔ RKMP",
+    "runsOn": "Sun, Mon, Tue, Wed, Thu, Fri, Sat",
+    "classes": "CC, EC",
+    "totalDistance": "703 km",
+    "schedule": [
+      { "sn": 1, "station": "New Delhi", "code": "NDLS", "arr": "Source", "dep": "06:00", "halt": "--", "dist": "0 km", "day": 1 },
+      { "sn": 2, "station": "Mathura Junction", "code": "MTJ", "arr": "07:19", "dep": "07:20", "halt": "1 min", "dist": "141 km", "day": 1 },
+      { "sn": 3, "station": "Agra Cantt", "code": "AGC", "arr": "07:50", "dep": "07:55", "halt": "5 min", "dist": "195 km", "day": 1 },
+      { "sn": 4, "station": "Gwalior Junction", "code": "GWL", "arr": "09:23", "dep": "09:28", "halt": "5 min", "dist": "313 km", "day": 1 },
+      { "sn": 5, "station": "VGL Jhansi Junction", "code": "VGLJ", "arr": "10:45", "dep": "10:50", "halt": "5 min", "dist": "411 km", "day": 1 },
+      { "sn": 6, "station": "Rani Kamalapati", "code": "RKMP", "arr": "14:40", "dep": "Destination", "halt": "--", "dist": "703 km", "day": 1 }
+    ]
+  },
+  "12626": {
+    "number": "12626",
+    "name": "New Delhi - Thiruvananthapuram Central Kerala Express",
+    "route": "NDLS ➔ TVC",
+    "runsOn": "Sun, Mon, Tue, Wed, Thu, Fri, Sat",
+    "classes": "2A, 3A, SL",
+    "totalDistance": "3035 km",
+    "schedule": [
+      { "sn": 1, "station": "New Delhi", "code": "NDLS", "arr": "Source", "dep": "20:10", "halt": "--", "dist": "0 km", "day": 1 },
+      { "sn": 2, "station": "Mathura Junction", "code": "MTJ", "arr": "21:38", "dep": "21:40", "halt": "2 min", "dist": "141 km", "day": 1 },
+      { "sn": 3, "station": "Agra Cantt", "code": "AGC", "arr": "22:20", "dep": "22:25", "halt": "5 min", "dist": "195 km", "day": 1 },
+      { "sn": 4, "station": "Nagpur Junction", "code": "NGP", "arr": "11:45", "dep": "11:50", "halt": "5 min", "dist": "1096 km", "day": 2 },
+      { "sn": 5, "station": "Vijayawada Junction", "code": "BZA", "arr": "21:20", "dep": "21:30", "halt": "10 min", "dist": "1760 km", "day": 2 },
+      { "sn": 6, "station": "Katpadi Junction", "code": "KPD", "arr": "06:10", "dep": "06:15", "halt": "5 min", "dist": "2323 km", "day": 3 },
+      { "sn": 7, "station": "Ernakulam Town", "code": "ERN", "arr": "15:25", "dep": "15:30", "halt": "5 min", "dist": "2815 km", "day": 3 },
+      { "sn": 8, "station": "Thiruvananthapuram Central", "code": "TVC", "arr": "21:50", "dep": "Destination", "halt": "--", "dist": "3035 km", "day": 3 }
+    ]
+  }
+}

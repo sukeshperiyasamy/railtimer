@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RailDetails - Indian Railways Train Schedule & Route Checker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="navbar">
+      <div class="logo-area">
+        <span class="logo-icon">🚆</span>
+        <span class="logo-text">Rail<strong>Details</strong></span>
+      </div>
+      <div class="badge-status">
+        <span class="pulse-dot"></span> Live Schedule Engine
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Hero & Search Section -->
+      <section class="hero-section">
+        <h1>Indian Railways Schedule Search</h1>
+        <p class="subtitle">Look up train routes, timetables, platform details & running days</p>
+
+        <div class="search-card">
+          <div class="search-inputs">
+            <div class="input-group">
+              <label for="trainInput">Train Number or Name</label>
+              <div class="input-wrapper">
+                <span class="icon">🔍</span>
+                <input type="text" id="trainInput" placeholder="e.g., 12951 or Rajdhani Express" autocomplete="off">
+              </div>
+            </div>
+            <button id="searchBtn" class="btn-primary">Search Schedule</button>
+          </div>
+
+          <div class="popular-searches">
+            <span>Popular Trains:</span>
+            <button class="chip" data-train="12951">12951 (Mumbai Rajdhani)</button>
+            <button class="chip" data-train="22436">22436 (Vande Bharat)</button>
+            <button class="chip" data-train="12002">12002 (Bhopal Shatabdi)</button>
+            <button class="chip" data-train="12626">12626 (Kerala Express)</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Results Section -->
+      <section id="resultsSection" class="results-section hidden">
+        <!-- Train Summary Card -->
+        <div class="train-summary-card">
+          <div class="train-header">
+            <div>
+              <div class="train-number-badge" id="trainNumber">12951</div>
+              <h2 id="trainName">Mumbai Central - New Delhi Tejas Rajdhani Express</h2>
+              <p class="route-summary" id="routeSummary">NDLS ➔ MMCT</p>
+            </div>
+            <div class="train-meta">
+              <div class="meta-item">
+                <span class="label">Runs On</span>
+                <span class="value" id="runsOn">Sun, Mon, Tue, Wed, Thu, Fri, Sat</span>
+              </div>
+              <div class="meta-item">
+                <span class="label">Classes</span>
+                <span class="value">1A, 2A, 3A</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Schedule Table / Timeline -->
+        <div class="schedule-card">
+          <div class="card-header">
+            <h3>Complete Route & Station Timetable</h3>
+            <span class="total-distance" id="totalDistance">1386 km</span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="schedule-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Station Name</th>
+                  <th>Code</th>
+                  <th>Arrives</th>
+                  <th>Departs</th>
+                  <th>Halt</th>
+                  <th>Distance</th>
+                  <th>Day</th>
+                </tr>
+              </thead>
+              <tbody id="scheduleBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Integration Guide Card -->
+      <section class="guide-section">
+        <h2>🛠️ How to Integrate Train Schedules into Your Site</h2>
+        <div class="grid-3">
+          <div class="info-card">
+            <div class="card-icon">⚡</div>
+            <h3>Why Not Direct Scraping?</h3>
+            <p><code>indianrail.gov.in</code> uses CAPTCHA protections, dynamic session tokens, and strict rate-limiting. Direct automated scraping breaks frequently and gets IP blocked.</p>
+          </div>
+          <div class="info-card">
+            <div class="card-icon">🔌</div>
+            <h3>Option 1: RapidAPI / Third-Party APIs</h3>
+            <p>Use APIs like <strong>Indian Railways API (RapidAPI)</strong> or <strong>RailYatri API</strong> to fetch structured JSON data securely on your server.</p>
+          </div>
+          <div class="info-card">
+            <div class="card-icon">🗄️</div>
+            <h3>Option 2: Local Timetable Database</h3>
+            <p>Indian Railway train schedules change infrequently. Importing official timetable JSON/DB allows instant, zero-latency queries without external API limits.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
