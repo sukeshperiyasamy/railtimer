@@ -15,11 +15,22 @@ import { TOOLS } from "@/lib/tools-directory";
  * Not needed yet at this scale.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [trains, stations, posts] = await Promise.all([
-    prisma.train.findMany({ select: { slug: true, updatedAt: true } }),
-    prisma.station.findMany({ select: { code: true } }),
-    prisma.blogPost.findMany({ select: { slug: true, publishedAt: true } }),
-  ]);
+  const trains = await prisma.train.findMany({
+    select: { slug: true, updatedAt: true },
+    orderBy: { updatedAt: "desc" },
+    take: 1000,
+  });
+
+  const stations = await prisma.station.findMany({
+    select: { code: true },
+    orderBy: { name: "asc" },
+    take: 500,
+  });
+
+  const posts = await prisma.blogPost.findMany({
+    select: { slug: true, publishedAt: true },
+    orderBy: { publishedAt: "desc" },
+  });
 
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: SITE_URL, changeFrequency: "daily", priority: 1 },

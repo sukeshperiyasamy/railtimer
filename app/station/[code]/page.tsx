@@ -27,7 +27,11 @@ async function getStation(code: string) {
 }
 
 export async function generateStaticParams() {
-  const stations = await prisma.station.findMany({ select: { code: true } });
+  const stations = await prisma.station.findMany({
+    select: { code: true },
+    orderBy: { name: "asc" },
+    take: 50,
+  });
   return stations.map((station) => ({ code: station.code }));
 }
 

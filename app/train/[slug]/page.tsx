@@ -34,7 +34,11 @@ async function getTrain(slug: string) {
 type TrainWithStops = NonNullable<Awaited<ReturnType<typeof getTrain>>>;
 
 export async function generateStaticParams() {
-  const trains = await prisma.train.findMany({ select: { slug: true } });
+  const trains = await prisma.train.findMany({
+    select: { slug: true },
+    orderBy: { updatedAt: "desc" },
+    take: 100,
+  });
   return trains.map((train) => ({ slug: train.slug }));
 }
 
