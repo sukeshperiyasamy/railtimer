@@ -8,7 +8,11 @@ import { PostHogProvider } from "@/components/analytics/PostHogProvider";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
-const ADSENSE_CLIENT_ID = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID || "ca-pub-4716380535364145";
+// No hardcoded fallback: loading a real publisher's AdSense script on every
+// dev/preview deployment (not just production) risks invalid-traffic
+// policy violations. Only load it when the env var is explicitly set for
+// that environment. Keep this consistent with components/ads/AdSlot.tsx.
+const ADSENSE_CLIENT_ID = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,16 +45,26 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        <Script
-          id="adsbygoogle-global"
-          async
-          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}`}
-          crossOrigin="anonymous"
-          strategy="afterInteractive"
-        />
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground"
+        >
+          Skip to content
+        </a>
+        {ADSENSE_CLIENT_ID ? (
+          <Script
+            id="adsbygoogle-global"
+            async
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}`}
+            crossOrigin="anonymous"
+            strategy="afterInteractive"
+          />
+        ) : null}
         <PostHogProvider>
           <Header />
-          <main className="flex-1">{children}</main>
+          <main id="main-content" className="flex-1">
+            {children}
+          </main>
           <Footer />
           <Analytics />
         </PostHogProvider>
